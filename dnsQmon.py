@@ -2,7 +2,7 @@
 """
 Name:           dnsQmon (DNS Query Monitor)
 Version:        1.0
-Date:           12/03/2013
+Date:           12/28/2013
 Author:         karttoon (Jeff White)
 Contact:        karttoon@gmail.com
 
@@ -32,8 +32,8 @@ argument_parser.add_argument("--watchlist", help="Add a list of domains which yo
 argument_parser.add_argument("--commonlist", help="Add a list of domains which you feel are common, benign, or safe - used for scoring purposes only. Place each domain on a newline.", metavar="<file name>")
 argument_parser.add_argument("--serverlist", help="Add a list of DNS server IP addresses you expect queries from. These will be flagged in the written data. Place each IP on a newline.", metavar="<file name>")
 argument_parser.add_argument("--client", help="Make the program run as a client and send data to another system running the program as a server.", metavar="<server ip>")
-argument_parser.add_argument("--server", help="Make the program run as a server and listen for data from clients running the program. The default listening port is UDP/54321. Should be used in conjunction with -w or -d.", metavar="<listening ip>")
-argument_parser.add_argument("-p", "--port", help="UDP port to listen on if running as a server or UDP port to communicate over if running as a client. Default is UDP \"54321\".", type=int, metavar="<port number>")
+argument_parser.add_argument("--server", help="Make the program run as a server and listen for data from clients running the program. Should be used in conjunction with -w or -d.", metavar="<listening ip>")
+argument_parser.add_argument("-p", "--port", help="UDP port to listen on if running as a server or UDP port to communicate over if running as a client. Default is UDP/54321.", type=int, metavar="<port number>")
 user_arguments = argument_parser.parse_args()
 
 # Check for root so the application can monitor the traffic.

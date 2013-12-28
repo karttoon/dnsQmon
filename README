@@ -2,6 +2,39 @@ dnsQMon.py was written to monitor A/AAAA/PTR DNS queries from a socket without a
 
 It is recommended that you write the DNS queries to a CSV file for lower traffic volume networks and to the SQLite3 database for heavier traffic networks.
 
+usage: dnsQmon.py [-h] -i <interface> [-w <csv|sql>] [-f <file name>]
+                  [-t <seconds>] [-d] [-n <host name>]
+                  [--watchlist <file name>] [--commonlist <file name>]
+                  [--serverlist <file name>] [--client <server ip>]
+                  [--server <listening ip>] [-p <port number>]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i <interface>, --interface <interface>
+                        Specify the interface name to monitor (e.g. eth0) or specify 'any' to monitor all interfaces. An IP address must be bound to the monitored interface, even if it's just listening.
+  -w <csv|sql>, --write <csv|sql>
+                        Write output to a CSV file or a SQLite3 DB.
+  -f <file name>, --filename <file name>
+                        File name for the CSV or SQLite3 DB.
+  -t <seconds>, --time <seconds>
+                        Specify a time interval for writing data to a file. Default is 15 seconds but higher DNS traffic volumes should be adjusted up.
+  -d, --display         
+			Display domain queries. The default is off as high-volume networks can flood the screen.
+  -n <host name>, --name <host name>
+                        Set a name for this node to be stored with the logs. Default is hostname but can be changed to be more specific.
+  --watchlist <file name>
+                        Add a list of domains which you feel are suspicious, malicious, or of interest for watch - used for scoring purposes only. Place each domain on a newline.
+  --commonlist <file name>
+                        Add a list of domains which you feel are common, benign, or safe - used for scoring purposes only. Place each domain on a newline.
+  --serverlist <file name>
+                        Add a list of DNS server IP addresses you expect queries from. These will be flagged in the written data. Place each IP on a newline.
+  --client <server ip>  
+			Make the program run as a client and send data to another system running the program as a server.
+  --server <listening ip>
+                        Make the program run as a server and listen for data from clients running the program. The default listening port is UDP/54321. Should be used in conjunction with -w or -d.
+  -p <port number>, --port <port number>
+                        UDP port to listen on if running as a server or UDP port to communicate over if running as a client. Default is UDP/54321.
+
 Current flags are listed below:
 
 "u" - Uncommon domain. The SLD is not contained in the common domain list loaded into the program.
@@ -12,11 +45,11 @@ Current flags are listed below:
 "f" - The domain was first seen since program execution.
 "d" - The query came from a known DNS server.
 
-Typical data collection would be launched as such:
+Typical data collection could be launched as follows:
 
 python dnsQmon.py -i eth0 -w sql -f dnsqueries.db --watchlist watchdomain.txt --commonlist commondomain.txt --serverlist serverdomain.txt -d -t 30
 
-Below are a handful of database queries that extract data from the database for investigation and demonstrate some types of information you can retrieve. For display purposes when querying the DB from a Shell, I append 'column -t -s "|"'.
+Below are a handful of database queries that extract queries for investigation and demonstrate some types of information you can retrieve. For display purposes when querying the DB from a Shell, I append 'column -t -s "|"'.
 
 To see the first appearance of all domains since program execution:
 	sqlite3 --header <database_name> 'SELECT * FROM Queries WHERE Flags LIKE "%f%"' |column -t -s "|"
