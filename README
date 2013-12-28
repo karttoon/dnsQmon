@@ -1,6 +1,6 @@
 dnsQMon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries. It's end goal is to identify domains of interest, provide some visibility to perform digital network forensics, and general DNS analysis. Additionally, as there are no third-party requirements, it makes the program slightly more portable between Linux systems.
 
-It is recommended that you write the DNS queries to a CSV file for lower traffic volume networks and to the SQLite3 database for heavier traffic networks.
+It is recommended that you write the DNS queries to a CSV file for low-volume traffic networks and to the SQLite3 database for high-volume traffic networks.
 
 usage: dnsQmon.py [-h] -i <interface> [-w <csv|sql>] [-f <file name>]
                   [-t <seconds>] [-d] [-n <host name>]
@@ -52,7 +52,7 @@ python dnsQmon.py -i eth0 -w sql -f dnsqueries.db --watchlist watchdomain.txt --
 Below are a handful of database queries that extract queries for investigation and demonstrate some types of information you can retrieve. For display purposes when querying the DB from a Shell, I append 'column -t -s "|"'.
 
 To see the first appearance of all domains since program execution:
-	sqlite3 --header <database_name> 'SELECT * FROM Queries WHERE Flags LIKE "%f%"' |column -t -s "|"
+	sqlite3 --header queries.db 'SELECT * FROM Queries WHERE Flags LIKE "%f%"' |column -t -s "|"
 	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr      DstPort  RecordType  Domain                                     TLD   SLD               Levels  Score  Flags
 	12/28/2013  02:21:17  roonet    10.18.24.123  10653    10.18.22.12  53       A           www.google.com                             com   google.com        3       5      f
 	12/28/2013  02:21:17  roonet    10.18.24.123  56353    10.18.22.12  53       A           www.reddit.com                             com   reddit.com        3       5      f
