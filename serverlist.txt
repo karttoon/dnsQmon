@@ -1,3 +1,0 @@
-#List DNS server IP addresses. The program will flag any query sent by a DNS server with a "d" so that it is easily recognizable from a standard client.
-#Do not use domain names for this list.
-10.18.22.12
