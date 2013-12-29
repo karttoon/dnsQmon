@@ -1,4 +1,4 @@
-dnsQMon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries. It's end goal is to identify domains of interest, provide some visibility to perform digital network forensics, and general DNS analysis. Additionally, as there are no third-party requirements, it makes the program slightly more portable between Linux systems.
+dnsQMon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 
 It is recommended that you write the DNS queries to a CSV file for low-volume traffic networks and to the SQLite3 database for high-volume traffic networks.
 
@@ -49,63 +49,60 @@ Typical data collection could be launched as follows:
 
 python dnsQmon.py -i eth0 -w sql -f dnsqueries.db --watchlist watchdomain.txt --commonlist commondomain.txt --serverlist serverdomain.txt -d -t 30
 
-Below are a handful of database queries that extract queries for investigation and demonstrate some types of information you can retrieve. For display purposes when querying the DB from a Shell, I append 'column -t -s "|"'.
+Below are a handful of database queries that demonstrate extracting the information around DNS queries for further review. For display purposes when querying the DB from a Bash Shell, I append 'column -t -s "|"'.
 
 To see the first appearance of all domains since program execution:
-	sqlite3 --header queries.db 'SELECT * FROM Queries WHERE Flags LIKE "%f%"' |column -t -s "|"
-	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr      DstPort  RecordType  Domain                                     TLD   SLD               Levels  Score  Flags
-	12/28/2013  02:21:17  roonet    10.18.24.123  10653    10.18.22.12  53       A           www.google.com                             com   google.com        3       5      f
-	12/28/2013  02:21:17  roonet    10.18.24.123  56353    10.18.22.12  53       A           www.reddit.com                             com   reddit.com        3       5      f
-	12/28/2013  02:21:18  roonet    10.18.24.123  49300    10.18.22.12  53       A           a.thumbs.redditmedia.com                   com   redditmedia.com   4       10     uf
-	12/28/2013  02:21:18  roonet    10.18.24.123  28827    10.18.22.12  53       A           static.adzerk.net                          net   adzerk.net        3       5      f
-	12/28/2013  02:21:18  roonet    10.18.24.123  46222    10.18.22.12  53       A           www.redditstatic.com                       com   redditstatic.com  3       10     uf
-	12/28/2013  02:21:19  roonet    10.18.24.123  30873    10.18.22.12  53       A           en.wikipedia.org                           org   wikipedia.org     3       5      f
-	12/28/2013  02:21:19  roonet    10.18.24.123  41991    10.18.22.12  53       A           imgur.com                                  com   imgur.com         2       5      f
-	12/28/2013  02:21:19  roonet    10.18.24.123  9430     10.18.22.12  53       A           ppcdn.500px.org                            org   500px.org         3       5      f
-	12/28/2013  02:21:19  roonet    10.18.24.123  6511     10.18.22.12  53       A           soundcloud.com                             com   soundcloud.com    2       5      f
-	12/28/2013  02:21:19  roonet    10.18.24.123  54498    10.18.22.12  53       A           tecidentity.com                            com   tecidentity.com   2       10     uf
-	12/28/2013  02:21:19  roonet    10.18.24.123  5285     10.18.22.12  53       A           www.forbes.com                             com   forbes.com        3       5      f
-	12/28/2013  02:21:19  roonet    10.18.24.123  33992    10.18.22.12  53       A           www.usatoday.com                           com   usatoday.com      3       5      f
-	12/28/2013  02:21:19  roonet    10.18.24.123  54928    10.18.22.12  53       A           www.ustornadoes.com                        com   ustornadoes.com   3       10     uf
-	12/28/2013  02:21:20  roonet    10.18.24.123  38266    10.18.22.12  53       A           www.youtube.com                            com   youtube.com       3       5      f
-	12/28/2013  02:21:20  roonet    10.18.24.123  11630    10.18.22.12  53       A           addons.mozilla.org                         org   mozilla.org       3       5      f
-	12/28/2013  02:21:20  roonet    10.18.24.123  11657    10.18.22.12  53       A           radioreddit.com                            com   radioreddit.com   2       10     uf
-	12/28/2013  02:21:20  roonet    10.18.24.123  19023    10.18.22.12  53       A           reddit.tv                                  tv    reddit.tv         2       11     uft
-	12/28/2013  02:21:20  roonet    10.18.24.123  36195    10.18.22.12  53       A           redditgifts.com                            com   redditgifts.com   2       5      f
-	12/28/2013  02:23:38  roonet    10.18.24.123  51388    10.18.22.12  53       PTR         b._dns-sd._udp.64.24.18.10.in-addr.arpa    arpa  in-addr.arpa      9       15     ufl
-	12/28/2013  02:23:44  roonet    10.18.24.101  51055    10.18.22.12  53       A           pop.gmail.com                              com   gmail.com         3       5      f
-	12/28/2013  02:27:46  roonet    10.18.24.123  49659    10.18.22.12  53       A           wq1porm.s3.amazonaws.com                   com   amazonaws.com     4       40     bf
-	12/28/2013  02:30:02  roonet    10.18.24.66   50240    10.18.22.12  53       A           p10-keyvalueservice.icloud.com.akadns.net  net   akadns.net        5       15     ufl
-
-To see all queries that have a flag indicating they are on the watchlist or a score of 25+:
-	sqlit3 --header <database_name> 'SELECT * FROM Queries WHERE Score >= 25 OR Flags LIKE "%b"' |column -t -s "|"
-	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr      DstPort  RecordType  Domain                    TLD  SLD            Levels  Score  Flags
-	12/28/2013  02:27:46  roonet    10.18.24.123  49659    10.18.22.12  53       A           wq1porm.s3.amazonaws.com  com  amazonaws.com  4       40     bf
-
-To see all queries of a specific domain by keyword:
-	sqlite3 --header queries.db 'SELECT * FROM Queries WHERE Domain LIKE "%reddit%"' |column -t -s "|"
+	dnsQmon# sqlite3 --header queries.db 'SELECT * FROM Queries WHERE Flags like "%f%" ORDER BY Date ASC LIMIT 10' |column -t -s "|"
 	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr      DstPort  RecordType  Domain                    TLD  SLD               Levels  Score  Flags
+	12/28/2013  02:21:17  roonet    10.18.24.123  10653    10.18.22.12  53       A           www.google.com            com  google.com        3       5      f
 	12/28/2013  02:21:17  roonet    10.18.24.123  56353    10.18.22.12  53       A           www.reddit.com            com  reddit.com        3       5      f
 	12/28/2013  02:21:18  roonet    10.18.24.123  49300    10.18.22.12  53       A           a.thumbs.redditmedia.com  com  redditmedia.com   4       10     uf
-	12/28/2013  02:21:18  roonet    10.18.24.123  50462    10.18.22.12  53       A           c.thumbs.redditmedia.com  com  redditmedia.com   4       5      u
-	12/28/2013  02:21:18  roonet    10.18.24.123  60809    10.18.22.12  53       A           pixel.redditmedia.com     com  redditmedia.com   3       5      u
+	12/28/2013  02:21:18  roonet    10.18.24.123  28827    10.18.22.12  53       A           static.adzerk.net         net  adzerk.net        3       5      f
 	12/28/2013  02:21:18  roonet    10.18.24.123  46222    10.18.22.12  53       A           www.redditstatic.com      com  redditstatic.com  3       10     uf
-	12/28/2013  02:21:18  roonet    10.18.24.123  51065    10.18.22.12  53       A           pixel.redditmedia.com     com  redditmedia.com   3       5      u
-	12/28/2013  02:21:20  roonet    10.18.24.123  11657    10.18.22.12  53       A           radioreddit.com           com  radioreddit.com   2       10     uf
-	12/28/2013  02:21:20  roonet    10.18.24.123  19023    10.18.22.12  53       A           reddit.tv                 tv   reddit.tv         2       11     uft
-	12/28/2013  02:21:20  roonet    10.18.24.123  36195    10.18.22.12  53       A           redditgifts.com           com  redditgifts.com   2       5      f
-	12/28/2013  02:21:21  roonet    10.18.24.123  21962    10.18.22.12  53       A           reddit.com                com  reddit.com        2       0      None
-	12/28/2013  02:31:21  roonet    10.18.24.123  60421    10.18.22.12  53       A           www.redditstatic.com      com  redditstatic.com  3       5      u
+	12/28/2013  02:21:19  roonet    10.18.24.123  30873    10.18.22.12  53       A           en.wikipedia.org          org  wikipedia.org     3       5      f
+	12/28/2013  02:21:19  roonet    10.18.24.123  41991    10.18.22.12  53       A           imgur.com                 com  imgur.com         2       5      f
+	12/28/2013  02:21:19  roonet    10.18.24.123  9430     10.18.22.12  53       A           ppcdn.500px.org           org  500px.org         3       5      f
+	12/28/2013  02:21:19  roonet    10.18.24.123  6511     10.18.22.12  53       A           soundcloud.com            com  soundcloud.com    2       5      f
+	12/28/2013  02:21:19  roonet    10.18.24.123  54498    10.18.22.12  53       A           tecidentity.com           com  tecidentity.com   2       10     uf
+
+To see all queries that have a flag indicating they are on the watchlist or a score of 25+:
+	dnsQmon# sqlite3 --header queries.db 'SELECT * FROM Queries WHERE Score >= 20 OR Flags LIKE "%b%" LIMIT 10' |column -t -s "|"
+	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr      DstPort  RecordType  Domain                    TLD  SLD            Levels  Score  Flags
+	12/28/2013  02:27:46  roonet    10.18.24.123  49659    10.18.22.12  53       A           wq1porm.s3.amazonaws.com  com  amazonaws.com  4       40     bf
+	12/28/2013  03:25:46  roonet    10.18.24.123  3294     10.18.22.12  53       A           horadric.ru               ru   horadric.ru    2       45     uft
+	12/28/2013  12:10:25  roonet    10.18.23.40   64786    10.18.22.12  53       A           horadric.ru               ru   horadric.ru    2       40     ut
+	12/28/2013  13:33:45  roonet    10.18.24.101  62667    10.18.22.12  53       A           mc.yandex.ru              ru   yandex.ru      3       40     ft
+	12/28/2013  19:53:42  roonet    10.18.24.66   62487    10.18.22.12  53       A           s3.amazonaws.com          com  amazonaws.com  3       35     b
+	12/28/2013  20:25:12  roonet    10.18.23.40   58101    10.18.22.12  53       A           horadric.ru               ru   horadric.ru    2       40     ut
+	12/28/2013  20:26:24  roonet    10.18.23.40   59262    10.18.22.12  53       A           s3.amazonaws.com          com  amazonaws.com  3       35     b
+	12/28/2013  23:05:18  roonet    10.18.23.40   50717    10.18.22.12  53       A           horadric.ru               ru   horadric.ru    2       40     ut
+	12/28/2013  23:55:46  roonet    10.18.24.101  52421    10.18.22.12  53       A           s3.amazonaws.com          com  amazonaws.com  3       35     b
+	12/28/2013  23:59:22  roonet    10.18.24.101  59823    10.18.22.12  53       A           s3.amazonaws.com          com  amazonaws.com  3       35     b
+
+To see all queries of a specific domain by keyword:
+	dnsQmon# sqlite3 --header queries.db 'SELECT * FROM Queries WHERE (Domain LIKE "%reddit%" OR Domain LIKE "%google%") AND Flags LIKE "%f%" LIMIT 10' |column -t -s "|"
+	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr      DstPort  RecordType  Domain                     TLD  SLD                    Levels  Score  Flags
+	12/28/2013  02:21:17  roonet    10.18.24.123  10653    10.18.22.12  53       A           www.google.com             com  google.com             3       5      f
+	12/28/2013  02:21:17  roonet    10.18.24.123  56353    10.18.22.12  53       A           www.reddit.com             com  reddit.com             3       5      f
+	12/28/2013  02:21:18  roonet    10.18.24.123  49300    10.18.22.12  53       A           a.thumbs.redditmedia.com   com  redditmedia.com        4       10     uf
+	12/28/2013  02:21:18  roonet    10.18.24.123  46222    10.18.22.12  53       A           www.redditstatic.com       com  redditstatic.com       3       10     uf
+	12/28/2013  02:21:20  roonet    10.18.24.123  11657    10.18.22.12  53       A           radioreddit.com            com  radioreddit.com        2       10     uf
+	12/28/2013  02:21:20  roonet    10.18.24.123  19023    10.18.22.12  53       A           reddit.tv                  tv   reddit.tv              2       11     uft
+	12/28/2013  02:21:20  roonet    10.18.24.123  36195    10.18.22.12  53       A           redditgifts.com            com  redditgifts.com        2       5      f
+	12/28/2013  02:21:56  roonet    10.18.24.66   64859    10.18.22.12  53       A           android.googleapis.com     com  googleapis.com         3       5      f
+	12/28/2013  02:45:33  roonet    10.18.24.123  50810    10.18.22.12  53       A           lh5.googleusercontent.com  com  googleusercontent.com  3       5      f
+	12/28/2013  02:52:03  roonet    10.18.24.123  48590    10.18.22.12  53       A           www.google-analytics.com   com  google-analytics.com   3       5      f
+
 
 To see all queries between a date and time range where the score is over 10 and listed in descending order:
-	sqlite3 --header queries.db 'SELECT * FROM Queries WHERE (Date BETWEEN "12/25/2013" AND "12/28/2013") AND (Time BETWEEN "02:20:00" AND "02:25:00") AND Score > 10 ORDER BY Score DESC' |column -t -s "|"
-	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr      DstPort  RecordType  Domain                                   TLD   SLD           Levels  Score  Flags
-	12/28/2013  02:23:38  roonet    10.18.24.123  51388    10.18.22.12  53       PTR         b._dns-sd._udp.64.24.18.10.in-addr.arpa  arpa  in-addr.arpa  9       15     ufl
-	12/28/2013  02:21:20  roonet    10.18.24.123  19023    10.18.22.12  53       A           reddit.tv                                tv    reddit.tv     2       11     uft
+	dnsQmon# sqlite3 --header queries.db 'SELECT * FROM Queries WHERE (Date BETWEEN "12/28/2013" AND "12/29/2013") AND (Time BETWEEN "11:00:00" AND "12:11:34") AND Score > 10 ORDER BY Score DESC LIMIT 10' |column -t -s "|"
+	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr      DstPort  RecordType  Domain       TLD  SLD          Levels  Score  Flags
+	12/28/2013  12:10:25  roonet    10.18.23.40   64786    10.18.22.12  53       A           horadric.ru  ru   horadric.ru  2       40     ut
+	12/28/2013  11:57:09  roonet    10.18.24.101  61722    10.18.22.12  53       A           204st.us     us   204st.us     2       11     uft
 
 Dump all queries matching your search to a CSV file for further analysis:
-	sqlite3 --header -separator ',' queries.db 'SELECT * FROM Queries WHERE SrcAddr = "10.18.24.123" AND RecordType = "PTR"' > queries.csv
-	cat queries.csv 
+	dnsQmon# sqlite3 --header -separator ',' queries.db 'SELECT * FROM Queries WHERE SrcAddr = "10.18.24.123" AND RecordType = "PTR"' > queries.csv
+	dnsQmon# cat queries.csv 
 	Date,Time,Hostname,SrcAddr,SrcPort,DstAddr,DstPort,RecordType,Domain,TLD,SLD,Levels,Score,Flags
 	12/28/2013,02:23:37,roonet,10.18.24.123,51383,10.18.22.12,53,PTR,lb._dns-sd._udp.roonet.com,com,roonet.com,5,10,uf
 	12/28/2013,02:23:38,roonet,10.18.24.123,51388,10.18.22.12,53,PTR,b._dns-sd._udp.64.24.18.10.in-addr.arpa,arpa,in-addr.arpa,9,15,ufl

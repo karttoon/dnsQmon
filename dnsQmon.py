@@ -6,7 +6,7 @@ Date:           12/28/2013
 Author:         karttoon (Jeff White)
 Contact:        karttoon@gmail.com
 
-Description:    dnsQMon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries. It's end goal is to identify domains of interest, provide some visibility to perform digital network forensics, and general DNS analysis.
+Description:    dnsQMon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 """
 from threading import Thread
 from time import sleep,strftime,time
