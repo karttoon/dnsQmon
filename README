@@ -127,4 +127,4 @@ Dump all queries matching your search to a CSV file for further analysis:
 
 [+] CHANGELOG [+]
 
-v1.1 - 01/01/2014 = Adding Python Scapy module functionality and the ability to read in PCAP files. The Scapy module will allow for monitoring promiscous mode interfaces, along with the PCAP functionality. Cleaned up code and commented most relevant items. Added additional troubleshooting displays.
+v1.1 - 01/01/2014 = Adding Python Scapy module functionality and the ability to read in PCAP files. The Scapy module will allow for monitoring promiscuous mode interfaces, along with the PCAP functionality. Cleaned up code and commented most relevant items. Added additional troubleshooting displays.

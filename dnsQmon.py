@@ -137,7 +137,7 @@ def prog_init():
 				ipmon_source = check_output(["ip", "addr", "show", "dev", ipmon_source]).split()
         		        ipmon_source = ipmon_source[16].split("/")[0]
 			except:
-				print "\n[+] ERROR: Please verify the interface has an IPv4 address assigned and exists before proceeding, or specify \"any\" for all interfaces with IPv4 addresses. To monitor promiscous interfaces, install Scapy and relaunch the program."
+				print "\n[+] ERROR: Please verify the interface has an IPv4 address assigned and exists before proceeding, or specify \"any\" for all interfaces with IPv4 addresses. To monitor promiscuous interfaces, install Scapy and relaunch the program."
 				exit()
 	# Build watched domain list from supplied file. Ignore # as comment and convert/clean everything.
         if user_arguments.watchlist:
