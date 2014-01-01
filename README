@@ -1,19 +1,24 @@
-dnsQMon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
+dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can also provide some additional functionality. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 
 It is recommended that you write the DNS queries to a CSV file for low-volume traffic networks and to the SQLite3 database for high-volume traffic networks.
 
-usage: dnsQmon.py [-h] -i <interface> [-w <csv|sql>] [-f <file name>]
-                  [-t <seconds>] [-d] [-n <host name>]
+usage: dnsQmon.py [-h] [-i <interface>] [-w <csv|sql>] [-r <pcap file>]
+                  [-f <file name>] [-t <seconds>] [-d] [-n <host name>]
                   [--watchlist <file name>] [--commonlist <file name>]
                   [--serverlist <file name>] [--client <server ip>]
                   [--server <listening ip>] [-p <port number>]
 
+dnsQmon was written to monitor A/AAAA/PTR DNS queries on a network to assist in digital forensics.
+
 optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help            
+			Show this help message and exit.
   -i <interface>, --interface <interface>
-                        Specify the interface name to monitor (e.g. eth0) or specify 'any' to monitor all interfaces. An IP address must be bound to the monitored interface, even if it's just listening.
+                        Specify the interface name to monitor (e.g. eth0) or specify 'any' to monitor all interfaces. If the Python Scapy module is not insalled, an IP address must be bound to the monitored interface, even if it's just listening.
   -w <csv|sql>, --write <csv|sql>
                         Write output to a CSV file or a SQLite3 DB.
+  -r <pcap file>, --read <pcap file>
+                        Read in a PCAP file for processing instead of listening to network traffic. This option requires the Python Scapy module to be installed.
   -f <file name>, --filename <file name>
                         File name for the CSV or SQLite3 DB.
   -t <seconds>, --time <seconds>
@@ -31,7 +36,7 @@ optional arguments:
   --client <server ip>  
 			Make the program run as a client and send data to another system running the program as a server.
   --server <listening ip>
-                        Make the program run as a server and listen for data from clients running the program. The default listening port is UDP/54321. Should be used in conjunction with -w or -d.
+                        Make the program run as a server and listen for data from clients running the program. Should be used in conjunction with -w or -d.
   -p <port number>, --port <port number>
                         UDP port to listen on if running as a server or UDP port to communicate over if running as a client. Default is UDP/54321.
 
@@ -48,6 +53,17 @@ Current flags are listed below:
 Typical data collection could be launched as follows:
 
 python dnsQmon.py -i eth0 -w sql -f dnsqueries.db --watchlist watchdomain.txt --commonlist commondomain.txt --serverlist serverdomain.txt -d -t 30
+
+Additionally, you can read in packets from a PCAP file and process them as if you were listening on a network:
+
+        dnsQmon# dnsQmon.py -d -r ../packet_test.pcap --client 10.18.22.12
+        [+] Reading packets from PCAP file.
+        [-] DNS Packet: 1 - 01/01/2014 15:38:51 - 10.18.23.35:60678 > 10.18.22.12:53 - PTR Record - Score: 5 Flags: f - 12.22.18.10.in-addr.arpa
+        [-] DNS Packet: 2 - 01/01/2014 15:38:51 - 10.18.23.35:60679 > 10.18.22.12:53 - A Record - Score: 5 Flags: f - qmontest.com.roonet.com
+        [-] DNS Packet: 3 - 01/01/2014 15:38:51 - 10.18.23.35:60680 > 10.18.22.12:53 - AAAA Record - Score: 0 Flags: None - qmontest.com.roonet.com
+        [-] DNS Packet: 4 - 01/01/2014 15:38:51 - 10.18.23.35:60681 > 10.18.22.12:53 - A Record - Score: 5 Flags: f - qmontest.com
+        [-] DNS Packet: 5 - 01/01/2014 15:38:51 - 10.18.23.35:60682 > 10.18.22.12:53 - AAAA Record - Score: 0 Flags: None - qmontest.com
+        [+] Total packets read: 48 - Inspected DNS Queries: 5 (10.4%).
 
 Below are a handful of database queries that demonstrate extracting the information around DNS queries for further review. For display purposes when querying the DB from a Bash Shell, I append 'column -t -s "|"'.
 
@@ -108,3 +124,7 @@ Dump all queries matching your search to a CSV file for further analysis:
 	12/28/2013,02:23:38,roonet,10.18.24.123,51388,10.18.22.12,53,PTR,b._dns-sd._udp.64.24.18.10.in-addr.arpa,arpa,in-addr.arpa,9,15,ufl
 	12/28/2013,02:23:38,roonet,10.18.24.123,56279,10.18.22.12,53,PTR,db._dns-sd._udp.64.24.18.10.in-addr.arpa,arpa,in-addr.arpa,9,10,ul
 	12/28/2013,02:23:38,roonet,10.18.24.123,52258,10.18.22.12,53,PTR,b._dns-sd._udp.roonet.com,com,roonet.com,5,5,u
+
+[+] CHANGELOG [+]
+
+v1.1 - 01/01/2014 = Adding Python Scapy module functionality and the ability to read in PCAP files. The Scapy module will allow for monitoring promiscous mode interfaces, along with the PCAP functionality. Cleaned up code and commented most relevant items. Added additional troubleshooting displays.

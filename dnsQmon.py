@@ -1,29 +1,43 @@
 #!/usr/bin/python
 """
 Name:           dnsQmon (DNS Query Monitor)
-Version:        1.0
-Date:           12/28/2013
+Version:        1.1
+Date:           01/01/2014
 Author:         karttoon (Jeff White)
 Contact:        karttoon@gmail.com
 
-Description:    dnsQMon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
+Description:    dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can also provide some additional functionality. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 """
 from threading import Thread
 from time import sleep,strftime,time
 from struct import *
 from os import geteuid,path
-from platform import system
+from platform import system,python_version
 from subprocess import call,check_output
 import sys,socket,sqlite3,argparse,binascii
 
-# Default variables.
-server_port = 54321
-ts_flag = 0 # Flip to 1 to enable application troubleshooting.
+# Test for scapy. If it exists, it will allow for more functionality.
+try:
+	from scapy.all import *
+	has_scapy = 1
+except ImportError:
+	has_scapy = 0
+
+# Check Python version and warn if not 2.7.X
+py_version = python_version().split(".")
+if py_version[0] != "2" and py_version[1] != "7":
+	print "\n[+] WARNING: dnsQmon.py was written to work with Python 2.7.X. Other versions may cause issues."
+
+# Flip to 1 to enable application troubleshooting. It will display additional information as it progresses.
+ts_flag = 0
+if ts_flag == 1:
+	has_scapy = int(raw_input("[*] TS - Enter a 0 to disable Scapy or a 1 to enable: "))
 
 # Command line arguments:
 argument_parser = argparse.ArgumentParser(description="dnsQmon was written to monitor A/AAAA/PTR DNS queries on a network to assist in digital forensics.")
-argument_parser.add_argument("-i", "--interface", help="Specify the interface name to monitor (e.g. eth0) or specify 'any' to monitor all interfaces. An IP address must be bound to the monitored interface, even if it's just listening.", required=True, metavar="<interface>")
+argument_parser.add_argument("-i", "--interface", help="Specify the interface name to monitor (e.g. eth0) or specify 'any' to monitor all interfaces. If the Python Scapy module is not insalled, an IP address must be bound to the monitored interface, even if it's just listening.", metavar="<interface>")
 argument_parser.add_argument("-w", "--write", help="Write output to a CSV file or a  SQLite3 DB.", choices=["csv", "sql"], metavar="<csv|sql>")
+argument_parser.add_argument("-r", "--read", help="Read in a PCAP file for processing instead of listening to network traffic. This option requires the Python Scapy module to be installed.", metavar="<pcap file>")
 argument_parser.add_argument("-f", "--filename", help="File name for the CSV or SQLite3 DB.", metavar="<file name>")
 argument_parser.add_argument("-t", "--time", help="Specify a time interval for writing data to a file. Default is 15 seconds but higher DNS traffic volumes should be adjusted up.", metavar="<seconds>", type=int)
 argument_parser.add_argument("-d", "--display", help="Display domain queries. The default is off as high-volume networks can flood the screen.", action="store_true")
@@ -38,26 +52,33 @@ user_arguments = argument_parser.parse_args()
 
 # Check for root so the application can monitor the traffic.
 if geteuid() != 0:
-        print "This program requires root priviledges to function properly."
+        print "\n[+] ERROR: This program requires root priviledges to function properly.\n"
         exit()
 # Check for Linux.
 if system() != "Linux":
-	print "This program is designed to run on Linux systems."
+	print "\n[+] ERROR: This program is designed to run on Linux systems.\n"
 	exit()
 
 # Program initialization function. Set a number of default variables based on command line arguments and prepare others used throughout the program.
 def prog_init():
-        global file_name, ipmon_source, commondomain_list, watchdomain_list, newdomain_list, dnsserver_list, server_ip, server_port, host_name, total_packets, dns_packets, domain_list, time_interval
+        global file_name, read_file, ipmon_source, commondomain_list, watchdomain_list, newdomain_list, dnsserver_list, server_ip, server_port, host_name, total_packets, dns_packets, domain_list, time_interval
 	if ts_flag == 1:
 		print "[*] TS - Program init function started."
-		print "[*] TS - System is", system(), "."       
+		print "[*] TS - System is", system(), "."
+		if has_scapy == 1:
+			print "[*] TS - Scapy enabled."
+		else:
+			print "[*] TS - Scapy disabled."
+	# Define variables used throughout program.
 	total_packets = 0
         dns_packets = 0
+	server_port = 54321
 	newdomain_list = []
         domain_list = []
 	watchdomain_list = []
 	commondomain_list = []
 	dnsserver_list = []
+	# Begin processing arguments.
 	if user_arguments.interface:
         	ipmon_source = user_arguments.interface
 	else:
@@ -83,12 +104,15 @@ def prog_init():
 		server_port = user_arguments.port
 	if user_arguments.client:
 	        server_ip = user_arguments.client
+	# Don't allow server and client mode at the same time/
 	if user_arguments.client and user_arguments.server:
-		argument_parser.error("\nProgram cannot be run as a client and a server.\n")
+		argument_parser.error("[+] ERROR: Program cannot be run as a client and a server.")
+	# Define default file names for writing.
         if file_type == "csv" and file_name == None:
                 file_name = "queries.csv"
         elif file_type == "sql" and file_name == None:
                 file_name = "queries.db"
+	# Create files or database if they do not already exist.
         if file_type == "csv" and path.exists(file_name) == False:
                 with open(file_name,"a") as csv_file:
                         print "\n[+] Creating CSV " + file_name + "."
@@ -99,12 +123,23 @@ def prog_init():
                 db_command = db_connection.cursor()
                 db_command.execute("""CREATE TABLE Queries (Date numeric, Time numeric, Hostname text, SrcAddr text, SrcPort numeric, DstAddr text, DstPort numeric, RecordType text, Domain text, TLD text, SLD text, Levels numeric, Score numeric, Flags text)""")
                 db_connection.commit()
-                db_connection.close
+                db_connection.close	
+	if user_arguments.read:
+		read_file = user_arguments.read
+		if has_scapy == 0:
+			argument_parser.error("[+] ERROR: Scapy cannot be imported - PCAP Read functionality will not work.")
+	# Setup future socket or scapy sniff commands based on interface input. Socket requires interfaces to have an IP address.
         if ipmon_source == "any" or ipmon_source == None:
                 ipmon_source = ""
         else:
-                ipmon_source = check_output(["ip", "addr", "show", "dev", ipmon_source]).split()
-                ipmon_source = ipmon_source[16].split("/")[0]
+                if has_scapy == 0:
+			try:
+				ipmon_source = check_output(["ip", "addr", "show", "dev", ipmon_source]).split()
+        		        ipmon_source = ipmon_source[16].split("/")[0]
+			except:
+				print "\n[+] ERROR: Please verify the interface has an IPv4 address assigned and exists before proceeding, or specify \"any\" for all interfaces with IPv4 addresses. To monitor promiscous interfaces, install Scapy and relaunch the program."
+				exit()
+	# Build watched domain list from supplied file. Ignore # as comment and convert/clean everything.
         if user_arguments.watchlist:
                 with open(user_arguments.watchlist,"r") as watch_domains:
                         for wdomain in watch_domains:
@@ -112,12 +147,14 @@ def prog_init():
 					wdomain = wdomain.lower()
 					watchdomain_list.append(wdomain.strip())
 				
+	# Build common domain list from supplied file. Ignore # as comment and convert/clean everything.
         if user_arguments.commonlist:
                 with open(user_arguments.commonlist,"r") as common_domains:
                         for cdomain in common_domains:
 				if cdomain[0] != "#" and cdomain[0].isalnum() == True:
 					cdomain = cdomain.lower()
 					commondomain_list.append(cdomain.strip())
+	# Build domain server list from supplied file. Ignore # as comment and convert/clean everything.
 	if user_arguments.serverlist:
 		with open(user_arguments.serverlist,"r") as dns_servers:
 			for dserver in dns_servers:
@@ -127,8 +164,18 @@ def prog_init():
                 host_name = user_arguments.name
 	else:
 		host_name = socket.gethostname()
-	if display_onscreen == 0 and not user_arguments.write:
-		argument_parser.error("\nYou must either turn on query display or write them to a file to proceed.")
+	# Error if no data being sent, written, or displayed.
+	if display_onscreen == 0 and not user_arguments.write and not user_arguments.client:
+		argument_parser.error("[+] ERROR: You must either turn on query display or write them to a file to proceed.")
+	# Error if not reading a PCAP and not monitoring an interface.
+	if not user_arguments.interface:
+		if user_arguments.read:
+			pass
+		else:
+			argument_parser.error("[+] ERROR: You must specify an interface unless reading from a PCAP file.")
+	# Error if read and monitoring selected.
+	if user_arguments.read and user_arguments.interface:
+		argument_parser.error("[+] ERROR: You must either listen on an interface or read from a packet; not both.")
 	if ts_flag == 1:
 		print "[*] TS - Program init function finished."
 
@@ -137,50 +184,71 @@ def sniff_traffic(ipmon_source):
         global total_packets, dns_packets
 	if ts_flag == 1:
 		print "[*] TS - Started thread for sniffing traffic."
-        while True:
-                udp_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_UDP)
-                udp_socket.bind((ipmon_source,53))
-                raw_packet = udp_socket.recvfrom(4096)
-                total_packets += 1
-                if ts_flag == 1:
-			print "[*] TS - Raw packet start."
-			print raw_packet
-			print "[*] TS - Raw packet end."
-                raw_packet = raw_packet[0]
-                # Determine if bit is set for a query. Also helps verify DNS packet structure before proceeding.
-                query_flag = raw_packet[30]
-                query_mask = 0b10000000
-                query_flag = int(query_flag.encode("hex"),16)
-                query_flag = query_mask & query_flag
-                if query_flag == 0:
-			# Strip IP/Protocol information.
-                	ip_len, src_addr, dst_addr, src_port, dst_port = ip_strip(raw_packet)
-			# Determine DNS record type. Also helps verify DNS packet structure before proceeding. Additional record types that may be of interest would be \x00\x0f for MX and \x00\x02 for NS.
-                        dns_type = raw_packet[ip_len - 4:ip_len - 2]
-			# Based on the record type, gather the domain name and update display/append to buffer for writing to file.
-                        if dns_type == "\x00\x01":
-                                record_type = "A"
-                                domain_name = dns_strip(raw_packet,record_type, ip_len)
-				dns_packets += 1
-				domain_score, domain_flags, tld_name, sld_name, domain_levels = scored_domain(domain_name, src_addr)
-				dns_update(dns_packets, host_name, src_addr, src_port, dst_addr, dst_port, record_type, domain_name, tld_name, sld_name, domain_levels, domain_score, domain_flags)
-                        elif dns_type == "\x00\x0c":
-                                record_type = "PTR"
-                                domain_name = dns_strip(raw_packet,record_type, ip_len)
-				dns_packets += 1
-				domain_score, domain_flags, tld_name, sld_name, domain_levels = scored_domain(domain_name, src_addr)
-				dns_update(dns_packets, host_name, src_addr, src_port, dst_addr, dst_port, record_type, domain_name, tld_name, sld_name, domain_levels, domain_score, domain_flags)
-                        elif dns_type == "\x00\x1c":
-                                record_type = "AAAA"
-                                domain_name = dns_strip(raw_packet,record_type, ip_len)
-				dns_packets += 1
-				domain_score, domain_flags, tld_name, sld_name, domain_levels = scored_domain(domain_name, src_addr)
-				dns_update(dns_packets, host_name, src_addr, src_port, dst_addr, dst_port, record_type, domain_name, tld_name, sld_name, domain_levels, domain_score, domain_flags)
-			if ts_flag == 1:
-				print "[*] TS - Packet processing finished."
+	# Check for scapy and launch scapy sniff if present.
+	if has_scapy == 1:
+		if ts_flag == 1:
+			print "[*] TS - Starting Scapy sniffing."
+		# Launch scapy sniff on all interfaces.
+		if ipmon_source == "":
+			while True:
+				sniff(prn=scapy_strip, filter="udp port 53", store=0)
+		# Launch scapy sniff on specific interface or error.
+		else:
+			try:
+				while True:
+					sniff(prn=scapy_strip, iface=ipmon_source, filter="udp port 53", store=0)
+			except:
+				print "\n[+] ERROR: Please verify the interface exists before proceeding, or specify \"any\" for all interfaces.\n"
+				exit()
+	# Launch socket if scapy not present.
+	else:
+		if ts_flag == 1:
+			print "[*] TS - Starting Socket sniffing."
+	        while True:
+        	        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_UDP)
+	                udp_socket.bind((ipmon_source,53))
+        	        raw_packet = udp_socket.recvfrom(4096)
+                	total_packets += 1
+	                if ts_flag == 1:
+				print "[*] TS - Raw packet start."
+				print raw_packet
+				print "[*] TS - Raw packet end."
+	                raw_packet = raw_packet[0]
+        	        # Determine if bit is set for a query. Also helps verify DNS packet structure before proceeding.
+                	query_flag = raw_packet[30]
+	                query_mask = 0b10000000
+        	        query_flag = int(query_flag.encode("hex"),16)
+                	query_flag = query_mask & query_flag
+	                if query_flag == 0:
+				dns_valid = 0
+				# Strip IP/Protocol information.
+                		ip_len, src_addr, dst_addr, src_port, dst_port = ip_strip(raw_packet)
+				# Determine DNS record type. Also helps verify DNS packet structure before proceeding. Additional record types that may be of interest would be \x00\x0f for MX and \x00\x02 for NS.
+	                        dns_type = raw_packet[ip_len - 4:ip_len - 2]
+				# Based on the record type, gather the domain name and update display/append to buffer for writing to file.
+                	        if dns_type == "\x00\x01":
+                        	        record_type = "A"
+					dns_packets += 1
+					dns_valid = 1
+	                        elif dns_type == "\x00\x0c":
+        	                        record_type = "PTR"
+					dns_packets += 1
+					dns_valid = 1
+        	                elif dns_type == "\x00\x1c":
+                	                record_type = "AAAA"
+					dns_packets += 1
+					dns_valid = 1
+				if dns_valid == 1:
+					# Build string for writing/display.
+                        		domain_name = dns_strip(raw_packet,record_type, ip_len)
+					domain_score, domain_flags, tld_name, sld_name, domain_levels = scored_domain(domain_name, src_addr)
+					dns_update(dns_packets, host_name, src_addr, src_port, dst_addr, dst_port, record_type, domain_name, tld_name, sld_name, domain_levels, domain_score, domain_flags)
+				if ts_flag == 1:
+					print "[*] TS - Packet processing finished."
 
 def server_traffic(server_ip):
 	global domain_list, total_packets, dns_packets
+	# Build listening socket.
 	server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	server_socket.bind((server_ip, server_port))
 	if ts_flag == 1:
@@ -194,7 +262,9 @@ def server_traffic(server_ip):
 			# Strip out the check and append to buffer.
 			domain_list.append(dns_data[15:])
                 	dns_packets += 1
-			print "[-] DNS Packet:", str(dns_packets), "-", packet_split[3], "-", packet_split[1], packet_split[2], "-", packet_split[4] + ":" + packet_split[5], ">", packet_split[6] + ":" + packet_split[7], "-", packet_split[8], "Record - Score:", packet_split[14], "Flags:", packet_split[15], "-", packet_split[9]
+			# Print a displayed update if specified.
+			if user_arguments.display:
+				print "[-] DNS Packet:", str(dns_packets), "-", packet_split[3], "-", packet_split[1], packet_split[2], "-", packet_split[4] + ":" + packet_split[5], ">", packet_split[6] + ":" + packet_split[7], "-", packet_split[8], "Record - Score:", packet_split[14], "Flags:", packet_split[15], "-", packet_split[9]
 	if ts_flag == 1:
 		print "[*] TS - Server packet processing finished."
 
@@ -202,10 +272,13 @@ def dns_update(dns_packets, host_name, src_addr, src_port, dst_addr, dst_port, r
         global domain_list
 	if ts_flag == 1:
 		print "[*] TS - DNS update function running."
+	# Print a displayed update if specified.
         if user_arguments.display:
                	print "[-] DNS Packet:", str(dns_packets), "-", strftime("%m/%d/%Y %H:%M:%S -"), src_addr + ":" + str(src_port), ">", dst_addr + ":" + str(dst_port), "-", record_type, "Record - Score:", str(domain_score), "Flags:", domain_flags, "-", domain_name
+	# Append string to list for later writing.
         if user_arguments.write:
                	domain_list.append(strftime("%m/%d/%Y") + "," + strftime("%H:%M:%S") + "," + host_name + "," + src_addr + "," + str(src_port) + "," + dst_addr + "," + str(dst_port) + "," + record_type + "," + domain_name + "," + tld_name + "," + sld_name + "," + str(domain_levels) + "," + str(domain_score) + "," + domain_flags)
+	# Send string if specified.
         if user_arguments.client:
                	client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                	client_socket.sendto("dnsQmon-packet" + "," + (strftime("%m/%d/%Y") + "," + strftime("%H:%M:%S") + "," + host_name + "," + src_addr + "," + str(src_port) + "," + dst_addr + "," + str(dst_port) + "," + record_type + "," + domain_name + "," + "," + tld_name + "," + sld_name + "," + str(domain_levels) + "," + str(domain_score) + "," + domain_flags),(server_ip,server_port))
@@ -278,6 +351,42 @@ def dns_strip(raw_packet,record_type,ip_len):
 		print "[*] TS - Stripped domain:", domain_name.lower()
 	return domain_name.lower()
 
+def scapy_strip(scapy_packet):
+	global total_packets, dns_packets
+	if ts_flag == 1:
+		print "[*] TS - Scapy strip started."
+	scapy_valid = 0
+	total_packets += 1
+	# Verify DNS layer exists.
+	if scapy_packet.haslayer(DNS):
+		# Verify it's a DNS query.
+		if scapy_packet[DNS].qr == 0:
+			if scapy_packet[DNS].qd.qtype == 1:
+				dns_packets += 1
+				scapy_valid = 1
+				record_type = "A"
+			if scapy_packet[DNS].qd.qtype == 12:
+				dns_packets += 1
+				scapy_valid = 1
+				record_type = "PTR"
+			if scapy_packet[DNS].qd.qtype == 28:
+				dns_packets += 1
+				scapy_valid = 1
+				record_type = "AAAA"
+	if scapy_valid == 1:
+		# Build string for writing/display.
+		src_addr = scapy_packet[IP].src
+		src_port = scapy_packet[UDP].sport
+		dst_addr = scapy_packet[IP].dst
+		dst_port = scapy_packet[UDP].dport
+		domain_name = scapy_packet[DNS].qd.qname[0:(len(scapy_packet[DNS].qd.qname) - 1)]
+		domain_score, domain_flags, tld_name, sld_name, domain_levels = scored_domain(domain_name, src_addr)
+		dns_update(dns_packets, host_name, src_addr, src_port, dst_addr, dst_port, record_type, domain_name, tld_name, sld_name, domain_levels, domain_score, domain_flags)
+	if ts_flag == 1:
+		print scapy_packet.show()
+		print "[*] TS - Scapy strip finished."
+		
+
 def scored_domain(domain_name, src_addr):
         global newdomain_list
 	'''
@@ -292,9 +401,11 @@ def scored_domain(domain_name, src_addr):
 	domain_score = 0
 	domain_flags = []
         split_name = domain_name.split(".")
+	# Top level domain, e.g. - "com".
         tld_name = ".".join(split_name[len(split_name)-1:len(split_name)])
+	# Down to second level of domain, e.g. - "google.com".
         sld_name = ".".join(split_name[len(split_name)-2:len(split_name)])
-	dns_levels = len(split_name)
+	domain_levels = len(split_name)
 	# Flag "b" - Domain name  was identified in the watched domain list. Higher level of confidence due to the exact nature.
         flag_b = 35
         # Flag "u" - SLD is not in the common list and is marked uncommon.
@@ -310,28 +421,34 @@ def scored_domain(domain_name, src_addr):
         # Flag "f" - First occurence of this domain SLD since program launch.
         flag_f = 5
 	if ts_flag == 1:
-        	start_time = time()
+        	start_time = time.time()
+	# Check in common domain list.
         if user_arguments.commonlist:
                 if sld_name not in commondomain_list:
                         domain_score += flag_s
                         domain_flags.append("u")
+	# Check in watched domain list.
         if user_arguments.watchlist:
                 if domain_name in watchdomain_list:
                         domain_score += flag_b
                         domain_flags.append("b")
+	# Check if this domain has been seen yet since program execution.
         if sld_name not in newdomain_list:
                 domain_score += flag_f
                 domain_flags.append("f")
                 newdomain_list.append(sld_name)
+	# Check length of domain name (includes periods).
 	if len(domain_name) > 35:
 		domain_score += flag_l
 		domain_flags.append("l")
 	elif len(domain_name) < 7:
 		domain_score += flag_s
 		domain_flags.append("s")
+	# Check if source IP is in the known DNS server list.
 	if user_arguments.serverlist:
 		if src_addr in dnsserver_list:
 			domain_flags.append("d")
+	# Check and score TLD.
 	for tld_list_key, tld_list_value in tld_list.iteritems():
 		if tld_name in tld_list_value:
 			domain_score += tld_list_key
@@ -341,15 +458,16 @@ def scored_domain(domain_name, src_addr):
 			domain_score += 1
 			domain_flags.append("t")
 			break
+	# Replace empty flag list with value indicating nothing detected.
 	if domain_flags == []:
 		domain_flags = "None"
 	else:
 		domain_flags = "".join(domain_flags)
 	if ts_flag == 1: 
-        	end_time = time()
+        	end_time = time.time()
         	run_time = end_time - start_time
         	print "[*] TS - Scoring finished in " + str("%.2f" % run_time) + " seconds. Score", str(domain_score) + "."
-	return domain_score, domain_flags, tld_name, sld_name, dns_levels
+	return domain_score, domain_flags, tld_name, sld_name, domain_levels
 
 def display_screen():
 	if ts_flag == 1:
@@ -358,12 +476,20 @@ def display_screen():
 	if dns_packets == 0:
                	print "\n[+] Total packets received:", str(total_packets), "- Inspected DNS Queries: 0. Next update in", str("%.2f" % time_interval), "seconds."
 	else:
+		# Based on whether writing to a file, reading from a file, or receiving packets in server mode - change displayed message.
 		if user_arguments.write == "csv" or user_arguments.write == "sql":
-        		print "\n[+] Total packets received:", str(total_packets), "- Inspected DNS Queries:", str(dns_packets), "(" + "%.1f" % (float(dns_packets)/float(total_packets) * 100.0) + "%) -", str(len(domain_list)), "new records written to", file_name + ". Next update in", str("%.2f" % time_interval), "seconds."
+			if user_arguments.read:
+	        		print "\n[+] Total packets read:", str(total_packets), "- Inspected DNS Queries:", str(dns_packets), "(" + "%.1f" % (float(dns_packets)/float(total_packets) * 100.0) + "%) -", str(len(domain_list)), "new records written to", file_name + ".\n"
+			else:
+	        		print "\n[+] Total packets received:", str(total_packets), "- Inspected DNS Queries:", str(dns_packets), "(" + "%.1f" % (float(dns_packets)/float(total_packets) * 100.0) + "%) -", str(len(domain_list)), "new records written to", file_name + ". Next update in", str("%.2f" % time_interval), "seconds."
 		else:
-                	print "\n[+] Total packets received:", str(total_packets), "- Inspected DNS Queries:", str(dns_packets), "(" + "%.1f" % (float(dns_packets)/float(total_packets) * 100.0) + "%). Next update in", str("%.2f" % time_interval), "seconds."
+                	if user_arguments.read:
+				print "\n[+] Total packets read:", str(total_packets), "- Inspected DNS Queries:", str(dns_packets), "(" + "%.1f" % (float(dns_packets)/float(total_packets) * 100.0) + "%).\n"
+			else:	
+				print "\n[+] Total packets received:", str(total_packets), "- Inspected DNS Queries:", str(dns_packets), "(" + "%.1f" % (float(dns_packets)/float(total_packets) * 100.0) + "%). Next update in", str("%.2f" % time_interval), "seconds."
 	if ts_flag == 1:
 		print "[*] TS - Finished display screen function."
+
 def write_file():
         global domain_list, time_interval
 	if ts_flag == 1:
@@ -374,14 +500,15 @@ def write_file():
         # Write the updates to the CSV file.
         if user_arguments.write == "csv":
                 # Check how long it took the write to run in seconds and compare to the active time interval. If less, auto-adjust for the user.
-		start_time = time()
+		start_time = time.time()
                 with open(file_name,"a") as csv_file:
                         for line in list_transfer:
                                 csv_file.write("%s\n" % line)
-                end_time = time()
+                end_time = time.time()
                 run_time = end_time - start_time
 		if ts_flag == 1:
 			print "[*] TS - It took", str(run_time), "seconds to write to", file_name + "."
+		# Adjust run time if it's taking too long to write.
                 if run_time > time_interval:
                         print "\n[+] WARNING: Writing to the files is taking longer than the", str("%.2f" % time_interval), "second time interval. Adjusting by", "%.2f" % (run_time + 5), "seconds."
                         time_interval += run_time + 5
@@ -391,16 +518,17 @@ def write_file():
                 db_connection = sqlite3.connect(file_name)
                 db_command = db_connection.cursor()
                 # Check how long it took the write to run in seconds and compare to the active time interval. If less, auto-adjust for the user.
-                start_time = time()
+                start_time = time.time()
                 for line in list_transfer:
                         line = line.split(",")
                         db_command.execute("INSERT INTO queries VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", line)
                 db_connection.commit()
                 db_connection.close
-                end_time = time()
+                end_time = time.time()
                 run_time = end_time - start_time
 		if ts_flag == 1:
 			print "[*] TS - It took", str("%.2f" % run_time), "seconds to write to", file_name + "."
+		# Adjust run time if it's taking too long to write.
                 if run_time > time_interval:
                         print "\n[+] WARNING: Writing to the files is taking longer than the", str("%.2f" % time_interval), "second time interval. Adjusting by", "%.2f" % (run_time + 5), "seconds."
                         time_interval += run_time + 5.0
@@ -412,8 +540,19 @@ def write_file():
 def main():
 	if ts_flag == 1:
 		print "[*] TS - Main function started."
+	# Initialize program variables and parse user arguments.
         prog_init()
-        if user_arguments.server:
+	# Start reading from a PCAP file.
+	if user_arguments.read and has_scapy == 1:
+		print "\n[+] Reading packets from PCAP file.\n"
+		pcap_packets = rdpcap(read_file)
+		for packet in pcap_packets:
+			scapy_strip(packet)
+		display_screen()
+		if user_arguments.write:
+			write_file()
+	# Start listening for traffic from a client.
+        elif user_arguments.server:
 		print "\n[+] Starting server and waiting to receive DNS data from clients."
                 server_thread = Thread(target=server_traffic, args=(user_arguments.server,))
                 server_thread.daemon = True
@@ -423,10 +562,11 @@ def main():
                         display_screen()
                         if user_arguments.write:
                                 write_file()
+	# Start monitoring DNS network traffic.
         else:
                 print "\n[+] Monitoring DNS packets."
-                sniffer_thread = Thread(target=sniff_traffic, args=(ipmon_source,))
-                sniffer_thread.daemon = True
+		sniffer_thread = Thread(target=sniff_traffic, args=(ipmon_source,))
+        	sniffer_thread.daemon = True
                 sniffer_thread.start()
                 if user_arguments.write:
                         print "[-] Writing data every", str("%.2f" % time_interval), "seconds to", str(file_name) + "."
@@ -440,5 +580,6 @@ if __name__ == "__main__":
         try:
                 main()
         except KeyboardInterrupt:
+		# Close out of threads and exit.
                 print "\n[+] Shutting down the program.\n"
                 sys.exit()
