@@ -1,3 +1,5 @@
+Version 1.1 - 01/01/2014
+
 dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can also provide some additional functionality. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 
 It is recommended that you write the DNS queries to a CSV file for low-volume traffic networks and to the SQLite3 database for high-volume traffic networks.
