@@ -1,16 +1,32 @@
 Version 1.1 - 01/01/2014
 
+[+] Summary [+]
+
 dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can also provide some additional functionality. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 
-It is recommended that you write the DNS queries to a CSV file for low-volume traffic networks and to the SQLite3 database for high-volume traffic networks.
+You have the ability to write query information to a CSV or SQLite3 database. Currently these items are recorded: date, time, source IP, source port, destination IP, destination port, query  record type (A/AAAA/PTR), FQDN requested, the TLD, the SLD, the number of subdomain levels, the domain score, and the domain flags. It is recommend to write the data to a SQLite3 database as it makes extracting information a bit easier - plus you can always dump it to a CSV later.
+
+Scoring is fairly arbitrary based on the lists loaded into the program at execution. These will provide a decent place to start reviewing domains though.
+
+[+] Flags [+]
+
+Current flags are listed below:
+
+"u" - Uncommon domain. The SLD is not contained in the common domain list loaded into the program.
+"b" - Watchlist domain. The FQDN is contained in the watch list loaded into the program.
+"s" - The FQDN was marked as being short.
+"l" - The FQDN was marked as being long.
+"t" - The TLD was scored based on a weighted average in the program.
+"f" - The domain was first seen since program execution.
+"d" - The query came from a known DNS server.
+
+[+] Usage [+]
 
 usage: dnsQmon.py [-h] [-i <interface>] [-w <csv|sql>] [-r <pcap file>]
                   [-f <file name>] [-t <seconds>] [-d] [-n <host name>]
                   [--watchlist <file name>] [--commonlist <file name>]
                   [--serverlist <file name>] [--client <server ip>]
                   [--server <listening ip>] [-p <port number>]
-
-dnsQmon was written to monitor A/AAAA/PTR DNS queries on a network to assist in digital forensics.
 
 optional arguments:
   -h, --help            
@@ -42,15 +58,7 @@ optional arguments:
   -p <port number>, --port <port number>
                         UDP port to listen on if running as a server or UDP port to communicate over if running as a client. Default is UDP/54321.
 
-Current flags are listed below:
-
-"u" - Uncommon domain. The SLD is not contained in the common domain list loaded into the program.
-"b" - Watchlist domain. The FQDN is contained in the watch list loaded into the program.
-"s" - The FQDN was marked as being short.
-"l" - The FQDN was marked as being long.
-"t" - The TLD was scored based on a weighted average in the program.
-"f" - The domain was first seen since program execution.
-"d" - The query came from a known DNS server.
+[+] Execution [+]
 
 Typical data collection could be launched as follows:
 
@@ -66,6 +74,8 @@ Additionally, you can read in packets from a PCAP file and process them as if yo
         [-] DNS Packet: 4 - 01/01/2014 15:38:51 - 10.18.23.35:60681 > 10.18.22.12:53 - A Record - Score: 5 Flags: f - qmontest.com
         [-] DNS Packet: 5 - 01/01/2014 15:38:51 - 10.18.23.35:60682 > 10.18.22.12:53 - AAAA Record - Score: 0 Flags: None - qmontest.com
         [+] Total packets read: 48 - Inspected DNS Queries: 5 (10.4%).
+
+[+] Sample SQL Queries [+]
 
 Below are a handful of database queries that demonstrate extracting the information around DNS queries for further review. For display purposes when querying the DB from a Bash Shell, I append 'column -t -s "|"'.
 
