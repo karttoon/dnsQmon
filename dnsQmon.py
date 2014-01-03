@@ -1,8 +1,8 @@
 #!/usr/bin/python
 """
 Name:           dnsQmon (DNS Query Monitor)
-Version:        1.1
-Date:           01/01/2014
+Version:        1.2
+Date:           01/03/2014
 Author:         karttoon (Jeff White)
 Contact:        karttoon@gmail.com
 
@@ -374,11 +374,16 @@ def scapy_strip(scapy_packet):
 				scapy_valid = 1
 				record_type = "AAAA"
 	if scapy_valid == 1:
-		# Build string for writing/display.
-		src_addr = scapy_packet[IP].src
+		# Check for IPv4 or IPv6.
+		if scapy_packet.haslayer(IP):
+			src_addr = scapy_packet[IP].src
+			dst_addr = scapy_packet[IP].dst
+		if scapy_packet.haslayer(IPv6):
+			src_addr = scapy_packet[IPv6].src
+			dst_addr = scapy_packet[IPv6].dst
 		src_port = scapy_packet[UDP].sport
-		dst_addr = scapy_packet[IP].dst
 		dst_port = scapy_packet[UDP].dport
+		# Build string for writing/display.
 		domain_name = scapy_packet[DNS].qd.qname[0:(len(scapy_packet[DNS].qd.qname) - 1)]
 		domain_score, domain_flags, tld_name, sld_name, domain_levels = scored_domain(domain_name, src_addr)
 		dns_update(dns_packets, host_name, src_addr, src_port, dst_addr, dst_port, record_type, domain_name, tld_name, sld_name, domain_levels, domain_score, domain_flags)
