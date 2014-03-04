@@ -1,8 +1,9 @@
-Version 1.2 - 01/03/2014
+Version 1.3 - 03/03/2014
 
 [+] Summary [+]
 
-dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can also provide some additional functionality. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
+dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can provide more functionality, such as listening on promiscous interfaces. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
+
 
 You have the ability to write query information to a CSV or SQLite3 database. Currently these items are recorded: date, time, source IP, source port, destination IP, destination port, query record type (A/AAAA/PTR), FQDN requested, the TLD, the SLD, the number of subdomain levels, the domain score, and the domain flags. It is recommend to write the data to a SQLite3 database as it makes extracting information a bit easier - plus you can always dump it to a CSV later.
 
@@ -130,6 +131,21 @@ To see all queries between a date and time range where the score is over 10 and 
 	12/28/2013  12:10:25  roonet    10.18.23.40   64786    10.18.22.12  53       A           horadric.ru  ru   horadric.ru  2       40     ut
 	12/28/2013  11:57:09  roonet    10.18.24.101  61722    10.18.22.12  53       A           204st.us     us   204st.us     2       11     uft
 
+To see the Top 10 unique domains with a score over 25:
+	dnsQmon# sqlite3 --header queries.db 'SELECT * FROM Queries WHERE Score > 25 GROUP BY Domain ORDER BY Score DESC LIMIT 10' |column -t -s"|"
+	Date        Time      Hostname  SrcAddr       SrcPort  DstAddr         DstPort  RecordType  Domain                                  TLD  SLD               Levels  Score  Flags
+	12/31/2013  15:46:31  roonet    10.18.23.35   60775    10.18.22.12     53       AAAA        google.1234567890.123456890.1234590.ru  ru   1234590.ru        5       45     ult
+	01/03/2014  11:02:39  roonet    10.18.22.12   35701    208.67.220.220  53       A           ge.tt                                   tt   ge.tt             2       41     bsdt
+	01/07/2014  13:37:46  roonet    10.18.22.12   36369    208.67.220.220  53       A           helplinux.ru                            ru   helplinux.ru      2       40     udt
+	12/31/2013  13:20:32  roonet    10.18.23.40   62364    10.18.22.12     53       A           horadric.ru                             ru   horadric.ru       2       40     ut
+	01/06/2014  17:23:22  roonet    10.18.22.12   2035     208.67.220.220  53       A           mkln.ru                                 ru   mkln.ru           2       40     udt
+	01/08/2014  23:50:06  roonet    10.18.22.12   37083    208.67.222.222  53       A           oflex.ru                                ru   oflex.ru          2       40     udt
+	12/28/2013  02:27:46  roonet    10.18.24.123  49659    10.18.22.12     53       A           wq1porm.s3.amazonaws.com                com  amazonaws.com     4       40     bf
+	01/07/2014  23:34:03  roonet    10.18.24.123  56865    10.18.22.12     53       A           www.babycenter.ru                       ru   babycenter.ru     3       40     ut
+	01/07/2014  13:37:46  roonet    10.18.22.12   34881    208.67.220.220  53       A           www.helplinux.ru                        ru   helplinux.ru      3       40     udt
+	01/09/2014  10:03:27  roonet    10.18.24.66   14883    10.18.22.12     53       A           ad.yieldmanager.com                     com  yieldmanager.com  3       35     b
+
+
 Dump all queries matching your search to a CSV file for further analysis:
 	dnsQmon# sqlite3 --header -separator ',' queries.db 'SELECT * FROM Queries WHERE SrcAddr = "10.18.24.123" AND RecordType = "PTR"' > queries.csv
 	dnsQmon# cat queries.csv 
@@ -143,4 +159,6 @@ Dump all queries matching your search to a CSV file for further analysis:
 
 v1.1 - 01/01/2014 = Added Python Scapy module functionality and the ability to read in PCAP files. The Scapy module will allow for monitoring promiscuous mode interfaces, along with the PCAP functionality. Cleaned up code and commented most relevant items. Added additional troubleshooting displays.
 
-v1.2 - 01/03/2014 = Added IPv6 functionality to with the Scapy module to parse DNS queries sent via IPv6. 
+v1.2 - 01/03/2014 = Added IPv6 functionality to with the Scapy module to parse DNS queries sent via IPv6.
+
+v1.3 - 03/03/2014 = Tracked down an issue on a network doing ~1-2 million queries a day where about one in every 4 million packets cause the program the crash on unexpected (malformed) input. Added error checking and additional layers of parsing to address this. 

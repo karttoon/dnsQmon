@@ -1,12 +1,12 @@
 #!/usr/bin/python
 """
 Name:           dnsQmon (DNS Query Monitor)
-Version:        1.2
-Date:           01/03/2014
+Version:        1.3
+Date:           03/03/2014
 Author:         karttoon (Jeff White)
 Contact:        karttoon@gmail.com
 
-Description:    dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can also provide some additional functionality. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
+Description:    dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can provide more functionality, such as listening on promiscous interfaces. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 """
 from threading import Thread
 from time import sleep,strftime,time
@@ -359,20 +359,26 @@ def scapy_strip(scapy_packet):
 	total_packets += 1
 	# Verify DNS layer exists.
 	if scapy_packet.haslayer(DNS):
-		# Verify it's a DNS query.
-		if scapy_packet[DNS].qr == 0:
-			if scapy_packet[DNS].qd.qtype == 1:
-				dns_packets += 1
-				scapy_valid = 1
-				record_type = "A"
-			if scapy_packet[DNS].qd.qtype == 12:
-				dns_packets += 1
-				scapy_valid = 1
-				record_type = "PTR"
-			if scapy_packet[DNS].qd.qtype == 28:
-				dns_packets += 1
-				scapy_valid = 1
-				record_type = "AAAA"
+		try:
+			# Verify it's a DNS query.
+			if scapy_packet[DNS].qr == 0:
+				if scapy_packet[DNS].qdcount == 0:
+					scapy_valid = 0
+				else:
+					if scapy_packet[DNS].qd.qtype == 1:
+						dns_packets += 1
+						scapy_valid = 1
+						record_type = "A"
+					if scapy_packet[DNS].qd.qtype == 12:
+						dns_packets += 1
+						scapy_valid = 1
+						record_type = "PTR"
+					if scapy_packet[DNS].qd.qtype == 28:
+						dns_packets += 1
+						scapy_valid = 1
+						record_type = "AAAA"
+		except:
+			scapy_valid = 0
 	if scapy_valid == 1:
 		# Check for IPv4 or IPv6.
 		if scapy_packet.haslayer(IP):
