@@ -11,6 +11,14 @@ Scoring is fairly arbitrary based on the lists loaded into the program at execut
 
 dnsQmon was written to work with, and tested on, Python 2.7. It supports IPv4 traffic via Socket/Scapy and IPv6 traffic with Scapy.
 
+[+] CHANGELOG [+]
+
+v1.3 - 03/03/2014 = Tracked down an issue on a network doing ~1-2 million queries a day where about one in every 4 million packets cause the program the crash on unexpected (malformed) input. Added error checking and additional layers of parsing to address this.
+
+v1.2 - 01/03/2014 = Added IPv6 functionality to with the Scapy module to parse DNS queries sent via IPv6.
+
+v1.1 - 01/01/2014 = Added Python Scapy module functionality and the ability to read in PCAP files. The Scapy module will allow for monitoring promiscuous mode interfaces, along with the PCAP functionality. Cleaned up code and commented most relevant items. Added additional troubleshooting displays.
+
 [+] Flags [+]
 
 Current flags are listed below:
