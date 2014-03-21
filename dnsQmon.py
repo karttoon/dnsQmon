@@ -1,8 +1,8 @@
 #!/usr/bin/python
 """
 Name:           dnsQmon (DNS Query Monitor)
-Version:        1.3
-Date:           03/03/2014
+Version:        1.4
+Date:           03/21/2014
 Author:         karttoon (Jeff White)
 Contact:        karttoon@gmail.com
 
@@ -532,7 +532,10 @@ def write_file():
                 start_time = time.time()
                 for line in list_transfer:
                         line = line.split(",")
-                        db_command.execute("INSERT INTO queries VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", line)
+			try:
+                        	db_command.execute("INSERT INTO queries VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", line)
+			except:
+				pass
                 db_connection.commit()
                 db_connection.close
                 end_time = time.time()

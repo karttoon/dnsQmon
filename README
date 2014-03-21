@@ -1,9 +1,8 @@
-Version 1.3 - 03/03/2014
+Version 1.4 - 03/21/2014
 
 [+] Summary [+]
 
 dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can provide more functionality, such as listening on promiscous interfaces. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
-
 
 You have the ability to write query information to a CSV or SQLite3 database. Currently these items are recorded: date, time, source IP, source port, destination IP, destination port, query record type (A/AAAA/PTR), FQDN requested, the TLD, the SLD, the number of subdomain levels, the domain score, and the domain flags. It is recommend to write the data to a SQLite3 database as it makes extracting information a bit easier - plus you can always dump it to a CSV later.
 
@@ -12,6 +11,8 @@ Scoring is fairly arbitrary based on the lists loaded into the program at execut
 dnsQmon was written to work with, and tested on, Python 2.7. It supports IPv4 traffic via Socket/Scapy and IPv6 traffic with Scapy.
 
 [+] CHANGELOG [+]
+
+v1.4 - 03/21/2014 = Additional error checking included.
 
 v1.3 - 03/03/2014 = Tracked down an issue on a network doing ~1-2 million queries a day where about one in every 4 million packets cause the program the crash on unexpected (malformed) input. Added error checking and additional layers of parsing to address this.
 
