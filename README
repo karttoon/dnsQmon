@@ -13,11 +13,8 @@ dnsQmon was written to work with, and tested on, Python 2.7. It supports IPv4 tr
 [+] CHANGELOG [+]
 
 v1.4 - 03/21/2014 = Additional error checking included.
-
 v1.3 - 03/03/2014 = Tracked down an issue on a network doing ~1-2 million queries a day where about one in every 4 million packets cause the program the crash on unexpected (malformed) input. Added error checking and additional layers of parsing to address this.
-
 v1.2 - 01/03/2014 = Added IPv6 functionality to with the Scapy module to parse DNS queries sent via IPv6.
-
 v1.1 - 01/01/2014 = Added Python Scapy module functionality and the ability to read in PCAP files. The Scapy module will allow for monitoring promiscuous mode interfaces, along with the PCAP functionality. Cleaned up code and commented most relevant items. Added additional troubleshooting displays.
 
 [+] Flags [+]
@@ -164,10 +161,3 @@ Dump all queries matching your search to a CSV file for further analysis:
 	12/28/2013,02:23:38,roonet,10.18.24.123,56279,10.18.22.12,53,PTR,db._dns-sd._udp.64.24.18.10.in-addr.arpa,arpa,in-addr.arpa,9,10,ul
 	12/28/2013,02:23:38,roonet,10.18.24.123,52258,10.18.22.12,53,PTR,b._dns-sd._udp.roonet.com,com,roonet.com,5,5,u
 
-[+] CHANGELOG [+]
-
-v1.1 - 01/01/2014 = Added Python Scapy module functionality and the ability to read in PCAP files. The Scapy module will allow for monitoring promiscuous mode interfaces, along with the PCAP functionality. Cleaned up code and commented most relevant items. Added additional troubleshooting displays.
-
-v1.2 - 01/03/2014 = Added IPv6 functionality to with the Scapy module to parse DNS queries sent via IPv6.
-
-v1.3 - 03/03/2014 = Tracked down an issue on a network doing ~1-2 million queries a day where about one in every 4 million packets cause the program the crash on unexpected (malformed) input. Added error checking and additional layers of parsing to address this. 
