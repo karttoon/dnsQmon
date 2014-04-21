@@ -1,8 +1,8 @@
 #!/usr/bin/python
 """
 Name:           dnsQmon (DNS Query Monitor)
-Version:        1.4
-Date:           03/21/2014
+Version:        1.5
+Date:           04/21/2014
 Author:         karttoon (Jeff White)
 Contact:        karttoon@gmail.com
 
@@ -48,6 +48,7 @@ argument_parser.add_argument("--serverlist", help="Add a list of DNS server IP a
 argument_parser.add_argument("--client", help="Make the program run as a client and send data to another system running the program as a server.", metavar="<server ip>")
 argument_parser.add_argument("--server", help="Make the program run as a server and listen for data from clients running the program. Should be used in conjunction with -w or -d.", metavar="<listening ip>")
 argument_parser.add_argument("-p", "--port", help="UDP port to listen on if running as a server or UDP port to communicate over if running as a client. Default is UDP/54321.", type=int, metavar="<port number>")
+argument_parser.add_argument("--syslog", help="Send queries as Syslog to a remote server.", metavar="<syslog server IP>")
 user_arguments = argument_parser.parse_args()
 
 # Check for root so the application can monitor the traffic.
@@ -61,7 +62,7 @@ if system() != "Linux":
 
 # Program initialization function. Set a number of default variables based on command line arguments and prepare others used throughout the program.
 def prog_init():
-        global file_name, read_file, ipmon_source, commondomain_list, watchdomain_list, newdomain_list, dnsserver_list, server_ip, server_port, host_name, total_packets, dns_packets, domain_list, time_interval
+        global file_name, read_file, ipmon_source, commondomain_list, watchdomain_list, newdomain_list, dnsserver_list, server_ip, server_port, pri_value, host_name, total_packets, dns_packets, domain_list, time_interval
 	if ts_flag == 1:
 		print "[*] TS - Program init function started."
 		print "[*] TS - System is", system(), "."
@@ -73,6 +74,7 @@ def prog_init():
 	total_packets = 0
         dns_packets = 0
 	server_port = 54321
+	pri_value = 14 # PRI value for syslog. PRI is the facility number multiplied by 8 with the severity number then added. 14 = 1(x8) user facility and 6 informational severity.
 	newdomain_list = []
         domain_list = []
 	watchdomain_list = []
@@ -104,6 +106,9 @@ def prog_init():
 		server_port = user_arguments.port
 	if user_arguments.client:
 	        server_ip = user_arguments.client
+	# This is not currently used but the variable can be called later if you need to know the sending IP address. Add it back to the global variable list.
+	#if user_arguments.syslog:
+	#	sending_ip = ([(s.connect((user_arguments.syslog, 514)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1])
 	# Don't allow server and client mode at the same time/
 	if user_arguments.client and user_arguments.server:
 		argument_parser.error("[+] ERROR: Program cannot be run as a client and a server.")
@@ -135,7 +140,7 @@ def prog_init():
                 if has_scapy == 0:
 			try:
 				ipmon_source = check_output(["ip", "addr", "show", "dev", ipmon_source]).split()
-        		        ipmon_source = ipmon_source[16].split("/")[0]
+	        		ipmon_source = ipmon_source[16].split("/")[0]
 			except:
 				print "\n[+] ERROR: Please verify the interface has an IPv4 address assigned and exists before proceeding, or specify \"any\" for all interfaces with IPv4 addresses. To monitor promiscuous interfaces, install Scapy and relaunch the program."
 				exit()
@@ -165,8 +170,8 @@ def prog_init():
 	else:
 		host_name = socket.gethostname()
 	# Error if no data being sent, written, or displayed.
-	if display_onscreen == 0 and not user_arguments.write and not user_arguments.client:
-		argument_parser.error("[+] ERROR: You must either turn on query display or write them to a file to proceed.")
+	if display_onscreen == 0 and not user_arguments.write and not user_arguments.client and not user_argument.syslog:
+		argument_parser.error("[+] ERROR: You must either turn on query display, write to a file, send to syslog or a dnsQmon server to proceed.")
 	# Error if not reading a PCAP and not monitoring an interface.
 	if not user_arguments.interface:
 		if user_arguments.read:
@@ -278,10 +283,14 @@ def dns_update(dns_packets, host_name, src_addr, src_port, dst_addr, dst_port, r
 	# Append string to list for later writing.
         if user_arguments.write:
                	domain_list.append(strftime("%m/%d/%Y") + "," + strftime("%H:%M:%S") + "," + host_name + "," + src_addr + "," + str(src_port) + "," + dst_addr + "," + str(dst_port) + "," + record_type + "," + domain_name + "," + tld_name + "," + sld_name + "," + str(domain_levels) + "," + str(domain_score) + "," + domain_flags)
-	# Send string if specified.
+	# Send string to dnsQmon server.
         if user_arguments.client:
                	client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-               	client_socket.sendto("dnsQmon-packet" + "," + (strftime("%m/%d/%Y") + "," + strftime("%H:%M:%S") + "," + host_name + "," + src_addr + "," + str(src_port) + "," + dst_addr + "," + str(dst_port) + "," + record_type + "," + domain_name + "," + "," + tld_name + "," + sld_name + "," + str(domain_levels) + "," + str(domain_score) + "," + domain_flags),(server_ip,server_port))
+               	client_socket.sendto("dnsQmon-packet" + "," + (strftime("%m/%d/%Y") + "," + strftime("%H:%M:%S") + "," + host_name + "," + src_addr + "," + str(src_port) + "," + dst_addr + "," + str(dst_port) + "," + record_type + "," + domain_name + "," + tld_name + "," + sld_name + "," + str(domain_levels) + "," + str(domain_score) + "," + domain_flags),(server_ip,server_port))
+	# Send string to syslog server.
+	if user_arguments.syslog:
+               	syslog_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+               	syslog_socket.sendto(("<" + str(pri_value) + "> " + (strftime("%m/%d/%Y") + "," + strftime("%H:%M:%S") + "," + host_name + "," + src_addr + "," + str(src_port) + "," + dst_addr + "," + str(dst_port) + "," + record_type + "," + domain_name + "," + tld_name + "," + sld_name + "," + str(domain_levels) + "," + str(domain_score) + "," + domain_flags)),(user_arguments.syslog,514))
 	if ts_flag == 1:
 		print "[*] TS - DNS update function finished."	
 								

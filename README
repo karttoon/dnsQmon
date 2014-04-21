@@ -1,10 +1,10 @@
-Version 1.4 - 03/21/2014
+Version 1.5 - 04/21/2014
 
 [+] Summary [+]
 
 dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can provide more functionality, such as listening on promiscous interfaces. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 
-You have the ability to write query information to a CSV or SQLite3 database. Currently these items are recorded: date, time, source IP, source port, destination IP, destination port, query record type (A/AAAA/PTR), FQDN requested, the TLD, the SLD, the number of subdomain levels, the domain score, and the domain flags. It is recommend to write the data to a SQLite3 database as it makes extracting information a bit easier - plus you can always dump it to a CSV later.
+You have the ability to write query information to a CSV, SQLite3 database, a syslog server, or a dnsQmon server. Currently these items are recorded: date, time, source IP, source port, destination IP, destination port, query record type (A/AAAA/PTR), FQDN requested, the TLD, the SLD, the number of subdomain levels, the domain score, and the domain flags. It is recommend to write the data to a SQLite3 database as it makes extracting information a bit easier - plus you can always dump it to a CSV later. If you have the storage for it, a SIEM via syslog can make querying the data a breeze. At the bottom of this read me are some Splunk extraction parsers for syslog.
 
 Scoring is fairly arbitrary based on the lists loaded into the program at execution. These will provide a decent place to start reviewing domains though.
 
@@ -12,6 +12,7 @@ dnsQmon was written to work with, and tested on, Python 2.7. It supports IPv4 tr
 
 [+] CHANGELOG [+]
 
+v1.5 - 04/21/2014 = Added the capability to send via syslog (SQLite3 is great until it becomes too much, syslog was an easy way to dump into a SIEM).
 v1.4 - 03/21/2014 = Additional error checking included.
 v1.3 - 03/03/2014 = Tracked down an issue on a network doing ~1-2 million queries a day where about one in every 4 million packets cause the program the crash on unexpected (malformed) input. Added error checking and additional layers of parsing to address this.
 v1.2 - 01/03/2014 = Added IPv6 functionality to with the Scapy module to parse DNS queries sent via IPv6.
@@ -36,36 +37,58 @@ usage: dnsQmon.py [-h] [-i <interface>] [-w <csv|sql>] [-r <pcap file>]
                   [--watchlist <file name>] [--commonlist <file name>]
                   [--serverlist <file name>] [--client <server ip>]
                   [--server <listening ip>] [-p <port number>]
+                  [--syslog <syslog server IP>]
 
 optional arguments:
-  -h, --help            
-			Show this help message and exit.
+  -h, --help            show this help message and exit
   -i <interface>, --interface <interface>
-                        Specify the interface name to monitor (e.g. eth0) or specify 'any' to monitor all interfaces. If the Python Scapy module is not insalled, an IP address must be bound to the monitored interface, even if it's just listening.
+                        Specify the interface name to monitor (e.g. eth0) or
+                        specify 'any' to monitor all interfaces. If the Python
+                        Scapy module is not insalled, an IP address must be
+                        bound to the monitored interface, even if it's just
+                        listening.
   -w <csv|sql>, --write <csv|sql>
                         Write output to a CSV file or a SQLite3 DB.
   -r <pcap file>, --read <pcap file>
-                        Read in a PCAP file for processing instead of listening to network traffic. This option requires the Python Scapy module to be installed.
+                        Read in a PCAP file for processing instead of
+                        listening to network traffic. This option requires the
+                        Python Scapy module to be installed.
   -f <file name>, --filename <file name>
                         File name for the CSV or SQLite3 DB.
   -t <seconds>, --time <seconds>
-                        Specify a time interval for writing data to a file. Default is 15 seconds but higher DNS traffic volumes should be adjusted up.
-  -d, --display         
-			Display domain queries. The default is off as high-volume networks can flood the screen.
+                        Specify a time interval for writing data to a file.
+                        Default is 15 seconds but higher DNS traffic volumes
+                        should be adjusted up.
+  -d, --display         Display domain queries. The default is off as high-
+                        volume networks can flood the screen.
   -n <host name>, --name <host name>
-                        Set a name for this node to be stored with the logs. Default is hostname but can be changed to be more specific.
+                        Set a name for this node to be stored with the logs.
+                        Default is hostname but can be changed to be more
+                        specific.
   --watchlist <file name>
-                        Add a list of domains which you feel are suspicious, malicious, or of interest for watch - used for scoring purposes only. Place each domain on a newline.
+                        Add a list of domains which you feel are suspicious,
+                        malicious, or of interest for watch - used for scoring
+                        purposes only. Place each domain on a newline.
   --commonlist <file name>
-                        Add a list of domains which you feel are common, benign, or safe - used for scoring purposes only. Place each domain on a newline.
+                        Add a list of domains which you feel are common,
+                        benign, or safe - used for scoring purposes only.
+                        Place each domain on a newline.
   --serverlist <file name>
-                        Add a list of DNS server IP addresses you expect queries from. These will be flagged in the written data. Place each IP on a newline.
-  --client <server ip>  
-			Make the program run as a client and send data to another system running the program as a server.
+                        Add a list of DNS server IP addresses you expect
+                        queries from. These will be flagged in the written
+                        data. Place each IP on a newline.
+  --client <server ip>  Make the program run as a client and send data to
+                        another system running the program as a server.
   --server <listening ip>
-                        Make the program run as a server and listen for data from clients running the program. Should be used in conjunction with -w or -d.
+                        Make the program run as a server and listen for data
+                        from clients running the program. Should be used in
+                        conjunction with -w or -d.
   -p <port number>, --port <port number>
-                        UDP port to listen on if running as a server or UDP port to communicate over if running as a client. Default is UDP/54321.
+                        UDP port to listen on if running as a server or UDP
+                        port to communicate over if running as a client.
+                        Default is UDP/54321.
+  --syslog <syslog server IP>
+                        Send queries as Syslog to a remote server.
 
 [+] Execution [+]
 
@@ -161,3 +184,22 @@ Dump all queries matching your search to a CSV file for further analysis:
 	12/28/2013,02:23:38,roonet,10.18.24.123,56279,10.18.22.12,53,PTR,db._dns-sd._udp.64.24.18.10.in-addr.arpa,arpa,in-addr.arpa,9,10,ul
 	12/28/2013,02:23:38,roonet,10.18.24.123,52258,10.18.22.12,53,PTR,b._dns-sd._udp.roonet.com,com,roonet.com,5,5,u
 
+[+] Splunk Extraction Queries [+]
+
+EXTRACT-LogDate = (?i)^(?P<LogDate>\w+\s+\d+)
+EXTRACT-LogTime = (?i)^\w+\s+\d+\s+(?P<LogTime>[^ ]+)
+EXTRACT-LogSender = (?i)^(?:[^ ]* ){3}(?P<LogSender>[^ ]+)
+EXTRACT-QueryDate = (?i)^(?:[^ ]* ){5}(?P<QueryDate>[^,]+)
+EXTRACT-QueryTime = (?i)^[^,]*,(?P<QueryTime>[^,]+)
+EXTRACT-QueryHostName = (?i)^(?:[^,]*,){2}(?P<QueryHostName>[^,]+)
+EXTRACT-QuerySrcAddr = (?i)^(?:[^,]*,){3}(?P<QuerySrcAddr>[^,]+)
+EXTRACT-QuerySrcPort = (?i)^(?:[^,]*,){4}(?P<QuerySrcPort>[^,]+)
+EXTRACT-QueryDstAddr = (?i)^(?:[^,]*,){5}(?P<QueryDstAddr>[^,]+)
+EXTRACT-QueryDstPort = (?i)^(?:[^,]*,){6}(?P<QueryDstPort>[^,]+)
+EXTRACT-QueryRecordType = (?i)^(?:[^,]*,){7}(?P<QueryRecordType>[^,]+)
+EXTRACT-QueryDomain = (?i)^(?:[^,]*,){8}(?P<QueryDomain>[^,]+)
+EXTRACT-QueryTLD = (?i)^(?:[^,]*,){9}(?P<QueryTLD>[^,]+)
+EXTRACT-QuerySLD = (?i)^(?:[^,]*,){10}(?P<QuerySLD>[^,]+)
+EXTRACT-QueryLevels = (?i)^(?:[^,]*,){11}(?P<QueryLevels>[^,]+)
+EXTRACT-QueryScore = (?i)^(?:[^,]*,){12}(?P<QueryScore>[^,]+)
+EXTRACT-QueryFlags = (?i)^(?:[^,]*,){13}(?P<QueryFlags>[^,]+)
