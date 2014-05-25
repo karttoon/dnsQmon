@@ -1,8 +1,8 @@
 #!/usr/bin/python
 """
 Name:           dnsQmon (DNS Query Monitor)
-Version:        1.5
-Date:           04/21/2014
+Version:        1.6
+Date:           05/25/2014
 Author:         karttoon (Jeff White)
 Contact:        karttoon@gmail.com
 
@@ -170,7 +170,7 @@ def prog_init():
 	else:
 		host_name = socket.gethostname()
 	# Error if no data being sent, written, or displayed.
-	if display_onscreen == 0 and not user_arguments.write and not user_arguments.client and not user_argument.syslog:
+	if display_onscreen == 0 and not user_arguments.write and not user_arguments.client and not user_arguments.syslog:
 		argument_parser.error("[+] ERROR: You must either turn on query display, write to a file, send to syslog or a dnsQmon server to proceed.")
 	# Error if not reading a PCAP and not monitoring an interface.
 	if not user_arguments.interface:

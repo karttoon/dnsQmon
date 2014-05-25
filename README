@@ -1,4 +1,4 @@
-Version 1.5 - 04/21/2014
+Version 1.6 - 05/25/2014
 
 [+] Summary [+]
 
@@ -12,6 +12,7 @@ dnsQmon was written to work with, and tested on, Python 2.7. It supports IPv4 tr
 
 [+] CHANGELOG [+]
 
+v1.6 - 05/25/2014 = Fixed a variable name used for error handling syslog. No impact to functionality.
 v1.5 - 04/21/2014 = Added the capability to send via syslog (SQLite3 is great until it becomes too much, syslog was an easy way to dump into a SIEM).
 v1.4 - 03/21/2014 = Additional error checking included.
 v1.3 - 03/03/2014 = Tracked down an issue on a network doing ~1-2 million queries a day where about one in every 4 million packets cause the program the crash on unexpected (malformed) input. Added error checking and additional layers of parsing to address this.
