@@ -4,7 +4,7 @@ Name:           dnsQmon (DNS Query Monitor)
 Version:        1.6
 Date:           05/25/2014
 Author:         karttoon (Jeff White)
-Contact:        karttoon@gmail.com
+Contact:        karttoon@gmail.com @noottrak
 
 Description:    dnsQmon.py was written to monitor A/AAAA/PTR DNS queries from a socket without additional third-party Python libraries; however, if the Python Scapy module is available, it will use this over the Python Socket module as it can provide more functionality, such as listening on promiscous interfaces. It's end goal is to identify domains of interest, provide some visibility into DNS queries for network forensics, host-profiling, and general DNS analysis.
 """
